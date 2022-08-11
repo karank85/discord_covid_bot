@@ -1,39 +1,63 @@
-
 from discord.ext import commands
-from selenium import webdriver
-
+import requests
+import json
 
 client = commands.Bot(command_prefix="%")
+
+class Data:
+    def __init__(self, api_key, project_token):
+        self.data = None
+        self.api_key = api_key
+        self.project_token = project_token
+        self.params = {
+            "api_key": self.api_key
+        }
+        self.get_data()
+
+    def get_data(self):
+        response = requests.get(f'https://www.parsehub.com/api/v2/projects/{PROJECT_TOKEN}/last_ready_run/data',
+                                params=self.params)
+        self.data = json.loads(response.text)
+
+    def get_total_cases(self):
+        data = self.data['total']
+        for content in data:
+            if content['name'] == "Coronavirus Cases:":
+                return content['value']
+
+    def get_total_deaths(self):
+        data = self.data['total']
+        for content in data:
+            if content['name'] == "Deaths:":
+                return content['value']
+        return ""
+
+    def get_country_data(self, country):
+        data = self.data["country"]
+        if country.lower() == "america":
+            countryCopy = "USA"
+        elif country.lower() == "south korea":
+            countryCopy = "S. Korea"
+        else:
+            countryCopy = country
+        for content in data:
+            if content['name'].lower() == countryCopy.lower():
+                if content['selection3'][1:] == "":
+                    return f"Cases: {content['selection1']}\nDeaths: {content['selection2']}\nCases today: N/A"
+                else:
+                    return f"Cases: {content['selection1']}\nDeaths: {content['selection2']}\nCases today: {content['selection3'][1:]}"
+        return "Invalid data"
+
 
 @client.event
 async def on_ready():
     print("Covid bot is ready!")
 
+
 @client.command()
 async def case(ctx, *, country):
-    PATH = "/Users/karan/Downloads/chromedriver"
-    driver = webdriver.Chrome(PATH)
-    if country.lower() == "vietnam":
-        country = "viet-nam"
-    elif country.lower() == "usa" or country.lower() == "america":
-        country = "us"
-    elif country.lower() == "uae" or country.lower() == "united arab emirates":
-        country = "united-arab-emirates"
-    try:
-        driver.get(f"https://www.worldometers.info/coronavirus/country/{country.lower()}")
-        dayCase = driver.find_element_by_class_name("news_date")
-        textDay = dayCase.text.split(" ")
-        cases = driver.find_element_by_class_name("news_li")
-        textDisplay = cases.text.split(" ")
-        await ctx.send(f"\nLatest report: {textDay[1]} {textDay[0]} has {textDisplay[0]} cases")
-
-        driver.quit()
-    except:
-        await ctx.send("Please enter a valid country")
-        driver.quit()
+    data = Data(API_KEY, PROJECT_TOKEN)
+    await ctx.send(data.get_country_data(country))
 
 
-
-
-
-client.run('secret!')
+client.run(BOT_TOKEN)
